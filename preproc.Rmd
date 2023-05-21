@@ -122,19 +122,18 @@ db$works %>%
 ```
 
 
-FOLLOWS A VERY LONG OPERATION
+EDGELIST
 
 ```{r}
 db$works %>%
-  mutate(internal_references =
-           map(references,
-               ~str_extract_all(.,
-                                str_c(db$works$id,
-                                      collapse = "|"))
-  )) %>%
-  mutate(internal_references =
-             map(internal_references,
-                 discard, ~length(.x) == 0)) -> db$works
+  unnest(references) %>%
+  transmute(from = id,
+            to = references,
+            from_j = journal) %>%
+  filter(to %in% db$works$id) %>%
+  left_join(.,db$works %>% select(to_j = journal,id),
+            by = c("to" = "id")
+            )-> edgelist
 ```
 
 
