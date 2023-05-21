@@ -1,0 +1,141 @@
+---
+title: "ANVUR NETWORK"
+author: 'Giulio G: Cantone'
+date: "2023-05-20"
+output:
+---
+
+```{r setup, include=FALSE}
+pacman::p_load(
+  tidyverse,
+  openalexR,
+  readxl,
+  nplyr,
+  arrow
+)
+```
+
+```{r}
+db = list()
+```
+
+
+```{r}
+journals <- read_excel("Area13.xlsx") %>%
+  filter(`13/D3` %>% str_detect("A")) %>%
+  select(TITOLO,ISSN) %>%
+  mutate(ISSN = ISSN %>% str_replace("‐","-"))
+```
+
+
+```{r}
+oa_fetch(
+  entity = "venues",
+  issn = journals %>% pull(ISSN),
+) -> db$journals
+```
+
+```{r}
+db$journals %>%
+  filter(!is.na(x_concepts)) %>%
+  mutate(x_concepts = map(x_concepts,
+                          ~select(.x,
+                                  c("display_name",
+                                    "score",
+                                    "level")))
+         ) %>%
+  select(display_name, x_concepts) %>%
+  unnest(x_concepts,
+         names_sep = "_") %>%
+  rename(Concept = x_concepts_display_name,
+         Score = x_concepts_score,
+         Level = x_concepts_level) -> db$joun_conc
+
+db$joun_conc %>%
+  summarise(Score = sum(Score),
+            .by = c("Concept", "Level")
+            ) %>%
+  arrange(Score) -> db$concepts
+```
+
+```{r}
+db$journals %>%
+  filter(!is.na(x_concepts)) %>%
+  mutate(x_concepts = map(x_concepts,
+                          ~select(.x,
+                                  c("display_name",
+                                    "score",
+                                    "level")))
+         ) %>%
+  select(display_name, x_concepts) %>%
+  unnest_wider(x_concepts,
+         names_sep = "_") %>%
+  select(
+    Journal = display_name,
+    Concepts = x_concepts_display_name,
+         ) %>%
+  hoist(Concepts) -> db$journ_conc_ext
+
+filter(db$journals,
+       display_name %in%
+         (db$journ_conc_ext %>%
+         mutate(Concepts =
+                  str_extract(Concepts,
+                              "^[^,]*(?:,[^,]*){0,1}")) %>%
+         filter(Concepts %>%
+                  str_detect(
+                  c(                    "Demog|Sociol|Social|Polit|Polic|Cultu|Psych|Popul|Crim|Edu|Geoga")
+             )) %>%
+           mutate(Concepts =
+                  str_extract(Concepts,
+                              "^[^,]*(?:,[^,]*){0}")) %>%
+           filter(
+             !(str_detect(Concepts, "Economics") &
+               !str_detect(Journal, "Demog|Sociol|Social|Polic|Cultu|Psych|Popul|Crim|Edu|Geoga"))) %>%
+         pull(Journal)
+         )) %>%
+  distinct() -> db$journ_selection
+
+```
+
+```{r}
+oa_fetch(
+  entity = "works",
+  primary_location.source.id = db$journ_selection$id,
+  publication_year = c(2018:2023)
+) -> db$works
+
+db$works %>%
+  filter(!is.na(author)) %>%
+  transmute(id,
+         journal = so,
+         title = display_name,
+         author,
+         publication_date,
+         year = publication_year,
+         references = referenced_works,
+         cited_by_count,
+         counts_by_year,
+         so_id,
+         concepts
+         ) -> db$works
+```
+
+
+FOLLOWS A VERY LONG OPERATION
+
+```{r}
+db$works %>%
+  mutate(internal_references =
+           map(references,
+               ~str_extract_all(.,
+                                str_c(db$works$id,
+                                      collapse = "|"))
+  )) %>%
+  mutate(internal_references =
+             map(internal_references,
+                 discard, ~length(.x) == 0)) -> db$works
+```
+
+
+
