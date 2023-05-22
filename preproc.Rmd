@@ -84,14 +84,14 @@ filter(db$journals,
                               "^[^,]*(?:,[^,]*){0,1}")) %>%
          filter(Concepts %>%
                   str_detect(
-                  c(                    "Demog|Sociol|Social|Polit|Polic|Cultu|Psych|Popul|Crim|Edu|Geoga")
+                  c(                    "Demog|Sociol|Social|Polit|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu")
              )) %>%
            mutate(Concepts =
                   str_extract(Concepts,
                               "^[^,]*(?:,[^,]*){0}")) %>%
            filter(
              !(str_detect(Concepts, "Economics") &
-               !str_detect(Journal, "Demog|Sociol|Social|Polic|Cultu|Psych|Popul|Crim|Edu|Geoga"))) %>%
+               !str_detect(Journal, "Demog|Sociol|Social|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu"))) %>%
          pull(Journal)
          )) %>%
   distinct() -> db$journ_selection
@@ -136,5 +136,46 @@ db$works %>%
             )-> edgelist
 ```
 
+NODELISTS AND REDUCTION
 
+
+```{r}
+c(edgelist$from,edgelist$to) %>% unique() -> p_nodelist
+c(edgelist$from_j,edgelist$to_j) %>% unique() -> j_nodelist
+
+db$works <- db$works %>%
+  filter(db$works$id %in% p_nodelist)
+```
+International Authors
+
+```{r}
+db$works %>% unnest(author) -> db$authors
+
+db$authors %>%
+  summarise(
+    score = sum(cited_by_count)/n(),
+    .by = c(au_display_name,
+            institution_country_code,
+            institution_id)
+    ) %>% nrow()
+
+db$authors %>%
+  filter(au_display_name == "Rob Law") %>% View()
+```
+Italians
+
+```{r}
+db$authors %>%
+  filter(institution_country_code == "IT") -> db$authors_ITA
+
+db$authors_ITA$id %>% unique() %>% length()
+db$authors_ITA$journal %>% unique() %>% length()
+
+db$authors_ITA %>%
+  summarise(
+    n = n(),
+    .by = c(au_display_name)
+    ) %>% arrange(-n) %>%
+  head(20)
+```
 
