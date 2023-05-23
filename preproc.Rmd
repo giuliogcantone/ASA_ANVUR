@@ -82,16 +82,18 @@ filter(db$journals,
          mutate(Concepts =
                   str_extract(Concepts,
                               "^[^,]*(?:,[^,]*){0,1}")) %>%
-         filter(Concepts %>%
+         filter((Concepts %>%
                   str_detect(
-                  c(                    "Demog|Sociol|Social|Polit|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu")
-             )) %>%
+                  c(                    "Statis|Demog|Sociol|Social|Polit|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu")
+             )) |
+               Journal %>%
+               str_detect("Statis|Demog")) %>%
            mutate(Concepts =
                   str_extract(Concepts,
                               "^[^,]*(?:,[^,]*){0}")) %>%
            filter(
              !(str_detect(Concepts, "Economics") &
-               !str_detect(Journal, "Demog|Sociol|Social|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu"))) %>%
+               !str_detect(Journal, "Statis|Demog|Sociol|Social|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu"))) %>%
          pull(Journal)
          )) %>%
   distinct() -> db$journ_selection
@@ -104,6 +106,12 @@ oa_fetch(
   primary_location.source.id = db$journ_selection$id,
   publication_year = c(2018:2023)
 ) -> db$works
+
+oa_fetch(
+  entity = "works",
+  primary_location.source.id = db$journ_selection$id[1],
+  publication_year = c(2018:2023)
+) -> prova0
 
 db$works %>%
   filter(!is.na(author)) %>%
