@@ -1,0 +1,163 @@
+---
+title: "Network"
+author: 'Giulio G: Cantone'
+date: "2023-05-23"
+output
+---
+
+```{r setup, include=FALSE}
+pacman::p_load(
+  tidyverse,
+  tidygraph,
+  ggraph,
+  janitor
+)
+```
+
+set the network
+
+```{r}
+as_tbl_graph(edgelist %>%
+               filter(from_j %in% (db$authors_ITA$journal %>% unique),
+                      to_j %in% (db$authors_ITA$journal %>% unique)
+                      ) %>%
+               count(from = from_j,
+                     to = to_j)) -> total_g
+
+```
+
+Clustering
+
+```{r}
+total_g %>%
+  activate(nodes) %>%
+  mutate(infomap_clust = group_infomap(weights = n) %>% as_factor,
+         cluster_name =
+           case_match(infomap_clust,
+                      c("1") ~ "Mathematical Statistics",
+                      c("2") ~ "Demography",
+                      c("3") ~ "Social Statistics",
+                      c("4") ~ "Migration Studies",
+                      c("5") ~ "Psychology of Management",
+                      c("6") ~ "Evaluation",
+                      c("7") ~ "Theoretical Economics",
+                      c("8") ~ "Tourism",
+                      c("9") ~ "Industrial organisation",
+                      c("10") ~ "Public Administration",
+                      c("11") ~ "Marketing",
+                      c("12") ~ "Psychometrics",
+                      c("13") ~ "European Union",
+                      c("14") ~ "Child Psychology"
+                      ) %>% factor(levels = c("Mathematical Statistics","Demography",
+                                              "Social Statistics","Migration Studies",
+                                              "Psychology of Management",
+                                              "Evaluation","Theoretical Economics",
+                                              "Tourism","Industrial organisation",
+                                              "Public Administration",
+                                              "Marketing","Psychometrics",
+                                              "European Union","Child Psychology")),
+         macro_cluster =
+                      case_match(infomap_clust,
+                      c("1","7","12") ~ "Mathematical Statistics",
+                      c("2","4","5","14","9","10","13") ~ "Demography",
+                      c("3","6","8","11") ~ "Social Statistics"
+                      ) %>% factor(levels= c("Mathematical Statistics",
+                                             "Demography",
+                                             "Social Statistics"
+                                             ))
+         )-> total_g
+
+
+total_g %>% activate(nodes) %>%
+  as_tibble() %>%
+  count(cluster_name)
+
+total_g %>% activate(nodes) %>%
+  as_tibble() %>% View()
+```
+
+ggraph
+
+```{r}
+total_g %>%
+  filter(cluster_name %in% c("Demography","Social Statistics","Migration Studies",
+                              "Evaluation","Tourism")) %>%
+ggraph() +
+  geom_edge_link(aes(alpha = n), show.legend = FALSE) +
+  geom_node_point(aes(colour = macro_cluster),
+                  size = 2) +
+#  scale_color_manual(values = c("Mathematical Statistics" = "blue",
+#                                "Demography" = "red",
+#                                "Social Statistics" = "yellow"
+#                                )) +
+  geom_text(x = -1.1, y = 1.85, label = "International Sample",
+            size = 5.5, hjust = 0.5, vjust = 0.5) +
+  theme_graph() +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.position = c(0.05, 0.99),
+    legend.justification = c(0, 1),
+    legend.title = element_blank()
+  )
+
+total_g %>%
+  filter(cluster_name %in% c("Demography","Social Statistics","Migration Studies",
+                              "Evaluation","Tourism")) %>%
+ggraph() +
+  geom_edge_link(aes(alpha = n), show.legend = FALSE) +
+  geom_node_point(aes(colour = cluster_name),
+                  size = 2) +
+#  scale_color_manual(values = c("Mathematical Statistics" = "blue",
+#                                "Demography" = "red",
+#                                "Social Statistics" = "yellow"
+#                                )) +
+  geom_text(x = -1.1, y = 1.85, label = "International Sample",
+            size = 5.5, hjust = 0.5, vjust = 0.5) +
+  theme_graph() +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.position = c(0.05, 0.99),
+    legend.justification = c(0, 1),
+    legend.title = element_blank()
+  )
+```
+
+```{r}
+total_g %>% 
+  activate(edges) %>%
+  left_join(total_g %>% activate(nodes) %>% as_tibble() %>%
+              transmute(id = row_number(),macro_cluster),
+            by = c("from" = "id")) %>%
+  rename(from_cluster = macro_cluster) %>%
+  left_join(total_g %>% activate(nodes) %>% as_tibble() %>%
+              transmute(id = row_number(),macro_cluster),
+            by = c("to" = "id")) %>%
+  rename(to_cluster = macro_cluster) %>%
+  as_tibble() %>%
+  group_by(from_cluster, to_cluster) %>% 
+  summarise(n = sum(n)) %>% 
+  select(from_cluster, to_cluster, n) %>% 
+  spread(key = to_cluster, value = n, fill = 0) %>%
+  adorn_percentages(denominator = "row") %>%
+  adorn_rounding(2)
+
+total_g %>% 
+  activate(edges) %>%
+  left_join(total_g %>% activate(nodes) %>% as_tibble() %>%
+              transmute(id = row_number(),cluster_name),
+            by = c("from" = "id")) %>%
+  rename(from_cluster = cluster_name) %>%
+  left_join(total_g %>% activate(nodes) %>% as_tibble() %>%
+              transmute(id = row_number(),cluster_name),
+            by = c("to" = "id")) %>%
+  rename(to_cluster = cluster_name) %>%
+  as_tibble() %>%
+  group_by(from_cluster, to_cluster) %>% 
+  summarise(n = sum(n)) %>% 
+  select(from_cluster, to_cluster, n) %>%
+  spread(key = to_cluster, value = n, fill = 0) %>%
+  adorn_percentages(denominator = "row") %>%
+  adorn_rounding(3)
+  
+```
+

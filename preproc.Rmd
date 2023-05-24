@@ -58,6 +58,43 @@ db$joun_conc %>%
   arrange(Score) -> db$concepts
 ```
 
+Selection_prova
+
+```{r}
+db$joun_conc %>%
+  filter(str_detect(display_name,"Organization")) %>% View()
+
+db$joun_conc %>%
+  mutate(Stat_score =
+           ifelse(str_detect(Concept,"Statistics|Demog|Sociol"),
+                  max(Score[str_detect(Concept,"Statistics|Demog|Sociol")]),
+                  0),
+         Stat_score = max(Stat_score),
+         .by = display_name) %>%
+    filter(Stat_score > 25)
+
+db$joun_conc %>%
+  filter((display_name %>% str_detect(c("Statistis|Quantiat|Demogra|Sociol|Cultu|Touris|Evalu")) |
+            any(Concept %in% c("Demography","Sociology","Statistics"))
+          )) %>%
+  summarise(
+    IN = max(Score[Concept %>% str_detect(
+                  c("Statistics|Demogra|Sociol|Tour|Eval")
+                  )]),
+    OUT = max(Score[Concept %>% str_detect(c("Psych|Business"))]),
+    .by = display_name) %>%
+  filter(IN > OUT) -> A
+
+db$journ_selection %>%
+  filter(display_name %in% A$display_name)
+
+A %>%
+  filter(display_name %in% db$journ_selection$display_name)
+```
+
+
+Selection definitive
+
 ```{r}
 db$journals %>%
   filter(!is.na(x_concepts)) %>%
@@ -107,12 +144,6 @@ oa_fetch(
   publication_year = c(2018:2023)
 ) -> db$works
 
-oa_fetch(
-  entity = "works",
-  primary_location.source.id = db$journ_selection$id[1],
-  publication_year = c(2018:2023)
-) -> prova0
-
 db$works %>%
   filter(!is.na(author)) %>%
   transmute(id,
@@ -154,6 +185,7 @@ c(edgelist$from_j,edgelist$to_j) %>% unique() -> j_nodelist
 db$works <- db$works %>%
   filter(db$works$id %in% p_nodelist)
 ```
+
 International Authors
 
 ```{r}
@@ -167,8 +199,6 @@ db$authors %>%
             institution_id)
     ) %>% nrow()
 
-db$authors %>%
-  filter(au_display_name == "Rob Law") %>% View()
 ```
 Italians
 
@@ -176,6 +206,7 @@ Italians
 db$authors %>%
   filter(institution_country_code == "IT") -> db$authors_ITA
 
+db$authors_ITA$au_display_name %>% unique() %>% length()
 db$authors_ITA$id %>% unique() %>% length()
 db$authors_ITA$journal %>% unique() %>% length()
 
@@ -184,6 +215,6 @@ db$authors_ITA %>%
     n = n(),
     .by = c(au_display_name)
     ) %>% arrange(-n) %>%
-  head(20)
+  head(30)
 ```
 
