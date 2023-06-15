@@ -21,3 +21,22 @@ db$works %>%
             )-> edgelist
 
 db$works$id
+
+
+total_g %>%
+  ggraph() +
+  geom_edge_link(aes(alpha = n), show.legend = FALSE) +
+  geom_node_point(aes(colour = macro_cluster),
+                  size = 2) +
+  scale_color_manual(values = c("STEM-oriented Statistics" = "violet",
+                                "Social-oriented Statistics" = "yellow"
+  )) +
+  geom_text(x = -1.1, y = 1.85, label = "International Sample",
+            size = 5.5, hjust = 0.5, vjust = 0.5) +
+  theme_graph() +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.position = c(0.05, 0.99),
+    legend.justification = c(0, 1),
+    legend.title = element_blank()
+  )

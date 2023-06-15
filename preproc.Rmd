@@ -15,16 +15,16 @@ pacman::p_load(
 )
 ```
 
-```{r}
-db = list()
-```
+Sampler
 
 
 ```{r}
 journals <- read_excel("Area13.xlsx") %>%
-  filter(`13/D3` %>% str_detect("A")) %>%
-  select(TITOLO,ISSN) %>%
-  mutate(ISSN = ISSN %>% str_replace("‐","-"))
+  filter_at(vars(-TITOLO), any_vars(. %>% str_detect("A"))) %>%
+  transmute(
+    journal = TITOLO,
+    ISSN = ISSN %>% str_replace("‐","-")
+  )
 ```
 
 
@@ -32,179 +32,127 @@ journals <- read_excel("Area13.xlsx") %>%
 oa_fetch(
   entity = "venues",
   issn = journals %>% pull(ISSN),
-) -> db$journals
+) -> db_j
+
+db_j %>%
+  distinct(id,
+           .keep_all = T) -> db_j
 ```
 
-```{r}
-db$journals %>%
-  filter(!is.na(x_concepts)) %>%
-  mutate(x_concepts = map(x_concepts,
-                          ~select(.x,
-                                  c("display_name",
-                                    "score",
-                                    "level")))
-         ) %>%
-  select(display_name, x_concepts) %>%
-  unnest(x_concepts,
-         names_sep = "_") %>%
-  rename(Concept = x_concepts_display_name,
-         Score = x_concepts_score,
-         Level = x_concepts_level) -> db$joun_conc
-
-db$joun_conc %>%
-  summarise(Score = sum(Score),
-            .by = c("Concept", "Level")
-            ) %>%
-  arrange(Score) -> db$concepts
-```
-
-Selection_prova
-
-```{r}
-db$joun_conc %>%
-  filter(str_detect(display_name,"Organization")) %>% View()
-
-db$joun_conc %>%
-  mutate(Stat_score =
-           ifelse(str_detect(Concept,"Statistics|Demog|Sociol"),
-                  max(Score[str_detect(Concept,"Statistics|Demog|Sociol")]),
-                  0),
-         Stat_score = max(Stat_score),
-         .by = display_name) %>%
-    filter(Stat_score > 25)
-
-db$joun_conc %>%
-  filter((display_name %>% str_detect(c("Statistis|Quantiat|Demogra|Sociol|Cultu|Touris|Evalu")) |
-            any(Concept %in% c("Demography","Sociology","Statistics"))
-          )) %>%
-  summarise(
-    IN = max(Score[Concept %>% str_detect(
-                  c("Statistics|Demogra|Sociol|Tour|Eval")
-                  )]),
-    OUT = max(Score[Concept %>% str_detect(c("Psych|Business"))]),
-    .by = display_name) %>%
-  filter(IN > OUT) -> A
-
-db$journ_selection %>%
-  filter(display_name %in% A$display_name)
-
-A %>%
-  filter(display_name %in% db$journ_selection$display_name)
-```
-
-
-Selection definitive
-
-```{r}
-db$journals %>%
-  filter(!is.na(x_concepts)) %>%
-  mutate(x_concepts = map(x_concepts,
-                          ~select(.x,
-                                  c("display_name",
-                                    "score",
-                                    "level")))
-         ) %>%
-  select(display_name, x_concepts) %>%
-  unnest_wider(x_concepts,
-         names_sep = "_") %>%
-  select(
-    Journal = display_name,
-    Concepts = x_concepts_display_name,
-         ) %>%
-  hoist(Concepts) -> db$journ_conc_ext
-
-filter(db$journals,
-       display_name %in%
-         (db$journ_conc_ext %>%
-         mutate(Concepts =
-                  str_extract(Concepts,
-                              "^[^,]*(?:,[^,]*){0,1}")) %>%
-         filter((Concepts %>%
-                  str_detect(
-                  c(                    "Statis|Demog|Sociol|Social|Polit|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu")
-             )) |
-               Journal %>%
-               str_detect("Statis|Demog")) %>%
-           mutate(Concepts =
-                  str_extract(Concepts,
-                              "^[^,]*(?:,[^,]*){0}")) %>%
-           filter(
-             !(str_detect(Concepts, "Economics") &
-               !str_detect(Journal, "Statis|Demog|Sociol|Social|Polic|Cultu|Psych|Popul|Crim|Educ|Geoga|Evalu"))) %>%
-         pull(Journal)
-         )) %>%
-  distinct() -> db$journ_selection
-
-```
+Paper retrieval
 
 ```{r}
 oa_fetch(
   entity = "works",
-  primary_location.source.id = db$journ_selection$id,
-  publication_year = c(2018:2023)
-) -> db$works
+  primary_location.source.id = db_j$id,
+  publication_year = c(2019,2022),
+  authorships.institutions.country_code = "IT"
+) -> db_papers_ita
 
-db$works %>%
+db_papers_ita %>%
   filter(!is.na(author)) %>%
-  transmute(id,
-         journal = so,
-         title = display_name,
+  transmute(
+    id,
+    journal = so,
+    title = display_name,
          author,
          publication_date,
          year = publication_year,
-         references = referenced_works,
+         references_list = referenced_works,
          cited_by_count,
          counts_by_year,
          so_id,
          concepts
-         ) -> db$works
+         ) -> db_papers_ita
+
+
+```
+
+Unnest
+
+```{r}
+db_papers_ita %>%
+  unnest(author) %>%
+  mutate(author_contribution = 1/n(),
+         .by = title) %>%
+    filter(
+      institution_country_code == "IT",
+      institution_type == "education") %>%
+  select(id,journal,title,publication_date,year,references_list,cited_by_count,counts_by_year,so_id,concepts,
+         author = au_display_name,
+         author_contribution,
+         au_id,
+         institution = institution_display_name,
+         department = au_affiliation_raw) -> db_papers_ita
+```
+
+data cleaning filter
+
+```{r}
+db_papers_ita %>%
+  mutate(D_13 =
+           case_when(
+             department %>%
+               tolower() %>%
+               str_detect("econom|statis|busines|impres|manage|finan") ~ 1,
+             TRUE ~ 0
+           ),
+         department = department %>% tolower(),
+         department =
+           case_when(
+             department %>% str_detect("marco fanno") ~ "Economics and Management, Padova",
+             department %>% str_detect("(?=.*?econom)(?=.*?padova)") ~ "Economics and Management, Padova",
+             department %>% str_detect("(?=.*?statis)(?=.*?padova)") ~ "Statistical Sciences, Padova",
+             department %>% str_detect("(?=.*?econom)(?=.*?siena)") ~ "Economics and Statistics, Siena",
+             department %>% str_detect("(?=.*?busines)(?=.*?siena)") ~ "Business and Law, Siena",
+             department %>% str_detect("(?=.*?school of management)(?=.*?bocconi)") ~ "School of Management, Bocconi",
+             department %>% str_detect("(?=.*?finance)(?=.*?bocconi)") ~ "Finance, Bocconi",
+             department %>% str_detect("(?=.*?statis)(?=.*?padova)") ~ "Statistical Sciences, Padova",
+             department %>% str_detect("(?=.*?econom)(?=.*?turin)") ~ "Economics and Statistics, University of Turin",
+             department %>% str_detect("(?=.*?management)(?=.*?turin)") ~ "Management, University of Turin",
+             department %>% str_detect("(?=.*?econom)(?=.*?florence)") ~ "Economics, Florence",
+             department %>% str_detect("(?=.*?statist)(?=.*?florence)") ~ "Statistics and Computer Science, Florence",
+             department %>% str_detect("(?=.*?econom)(?=.*?bologna)") ~ "Economics, Bologna",
+             department %>% str_detect("(?=.*?manage)(?=.*?bologna)") ~ "Management, Bologna",
+             department %>% str_detect("(?=.*?statis)(?=.*?bologna)") ~ "Statistical Sciences, Bologna",
+             department %>% str_detect("(?=.*?econom)(?=.*?sapienza)") ~ "Economics, Sapienza",
+             department %>% str_detect("(?=.*?manage)(?=.*?sapienza)") ~ "Management, Sapienza",
+             department %>% str_detect("(?=.*?statis)(?=.*?sapienza)") ~ "Statistical Sciences, Sapienza",
+             department %>% str_detect("(politecnico).*?(milano)") ~ "Politecnico di Milano",
+             department %>% str_detect("udine") ~ "Economics and Statistics, Udine",
+             department %>% str_detect("messina") ~ "Economics, Messina",
+             department %>% str_detect("trento") ~ "Economics and Management, Trento",
+             department %>% str_detect("perugia") ~ "Economics, Perugia",
+             department %>% str_detect("ferrara") ~ "Economics and Management, Ferrara",
+             department %>% str_detect("foggia") ~ "Economics, Foggia",
+             department %>% str_detect("brescia") ~ "Economics and Management, Brescia",
+             department %>% str_detect("(?=.*?management)(?=.*?vergata)") ~ "Management and Law, Tor Vergata",
+             department %>% str_detect("(?=.*?econom)(?=.*?vergata)") ~ "Economics, Tor Vergata",
+             department %>% str_detect("(?=.*?econom)(?=.*?palermo)") ~ "Economics, Business and Statistics, Palermo",
+             department %>% str_detect("biagi|modena") ~ "Economics, Modena and Reggio Emilia",
+             department %>% str_detect("catania") ~ "Economics and Business, Catania",
+             TRUE ~ department
+             )
+         ) -> db_papers_ita_f
+
+db_papers_ita_f %>%
+  filter(D_13 == 1) %>%
+  count(department) %>%
+  arrange(-n) -> IN
+
+db_papers_ita %>%
+  filter(D_13 == 0) %>%
+  count(department) %>%
+  arrange(-n) -> OUT
+
 ```
 
 
-EDGELIST
+Italians 
 
 ```{r}
-db$works %>%
-  unnest(references) %>%
-  transmute(from = id,
-            to = references,
-            from_j = journal) %>%
-  filter(to %in% db$works$id) %>%
-  left_join(.,db$works %>% select(to_j = journal,id),
-            by = c("to" = "id")
-            )-> edgelist
-```
-
-NODELISTS AND REDUCTION
 
 
-```{r}
-c(edgelist$from,edgelist$to) %>% unique() -> p_nodelist
-c(edgelist$from_j,edgelist$to_j) %>% unique() -> j_nodelist
-
-db$works <- db$works %>%
-  filter(db$works$id %in% p_nodelist)
-```
-
-International Authors
-
-```{r}
-db$works %>% unnest(author) -> db$authors
-
-db$authors %>%
-  summarise(
-    score = sum(cited_by_count)/n(),
-    .by = c(au_display_name,
-            institution_country_code,
-            institution_id)
-    ) %>% nrow()
-
-```
-Italians
-
-```{r}
-db$authors %>%
-  filter(institution_country_code == "IT") -> db$authors_ITA
 
 db$authors_ITA$au_display_name %>% unique() %>% length()
 db$authors_ITA$id %>% unique() %>% length()
@@ -215,6 +163,6 @@ db$authors_ITA %>%
     n = n(),
     .by = c(au_display_name)
     ) %>% arrange(-n) %>%
-  head(30)
+  head(40)
 ```
 

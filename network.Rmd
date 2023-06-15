@@ -14,6 +14,31 @@ pacman::p_load(
 )
 ```
 
+
+EDGELIST
+
+```{r}
+db$works %>%
+  unnest(references) %>%
+  transmute(from = id,
+            to = references,
+            from_j = journal) %>%
+  filter(to %in% db$works$id) %>%
+  left_join(.,db$works %>% select(to_j = journal,id),
+            by = c("to" = "id")
+            )-> edgelist
+```
+
+NODELISTS AND REDUCTION
+
+```{r}
+c(edgelist$from,edgelist$to) %>% unique() -> p_nodelist
+c(edgelist$from_j,edgelist$to_j) %>% unique() -> j_nodelist
+
+db$works <- db$works %>%
+  filter(db$works$id %in% p_nodelist)
+```
+
 set the network
 
 ```{r}
@@ -31,65 +56,67 @@ Clustering
 ```{r}
 total_g %>%
   activate(nodes) %>%
-  mutate(infomap_clust = group_infomap(weights = n) %>% as_factor,
-         cluster_name =
+  mutate(infomap_clust = group_infomap(weights = n) %>% as_factor) -> total_g
+
+total_g %>%
+  activate(nodes) %>%
+  mutate(cluster_name =
            case_match(infomap_clust,
-                      c("1") ~ "Mathematical Statistics",
-                      c("2") ~ "Demography",
-                      c("3") ~ "Social Statistics",
-                      c("4") ~ "Migration Studies",
-                      c("5") ~ "Psychology of Management",
-                      c("6") ~ "Evaluation",
-                      c("7") ~ "Theoretical Economics",
-                      c("8") ~ "Tourism",
-                      c("9") ~ "Industrial organisation",
-                      c("10") ~ "Public Administration",
+                      c("1") ~ "Statistical Science",
+                      c("2") ~ "Quantitative Sociological",
+                      c("3") ~ "Economical Demography",
+                      c("4") ~ "Econometrics",
+                      c("5") ~ "Computational Social Science",
+                      c("6") ~ "Probability",
+                      c("7") ~ "Psychometrics",
+                      c("8") ~ "Education",
+                      c("9") ~ "Economic Geography",
+                      c("10") ~ "Tourism",
                       c("11") ~ "Marketing",
-                      c("12") ~ "Psychometrics",
-                      c("13") ~ "European Union",
-                      c("14") ~ "Child Psychology"
-                      ) %>% factor(levels = c("Mathematical Statistics","Demography",
-                                              "Social Statistics","Migration Studies",
-                                              "Psychology of Management",
-                                              "Evaluation","Theoretical Economics",
-                                              "Tourism","Industrial organisation",
-                                              "Public Administration",
-                                              "Marketing","Psychometrics",
-                                              "European Union","Child Psychology")),
+                      c("12") ~ "Big Data",
+                      c("13") ~ "Business",
+                      c("14") ~ "Actuarial Science",
+                      c("15") ~ "Library and Information Sciences",
+                      c("16") ~ "Marketing"
+                      ),
          macro_cluster =
                       case_match(infomap_clust,
-                      c("1","7","12") ~ "Mathematical Statistics",
-                      c("2","4","5","14","9","10","13") ~ "Demography",
-                      c("3","6","8","11") ~ "Social Statistics"
-                      ) %>% factor(levels= c("Mathematical Statistics",
-                                             "Demography",
-                                             "Social Statistics"
+                      c("1","4","6","12","14") ~ "STEM-oriented Statistics",
+                      c("2","3","5","7","8","9","10","11","13","15","16") ~ "Social-oriented Statistics"
+                      ) %>% factor(levels= c("STEM-oriented Statistics",
+                                             "Social-oriented Statistics"
                                              ))
          )-> total_g
 
 
 total_g %>% activate(nodes) %>%
   as_tibble() %>%
-  count(cluster_name)
+  count(cluster_name,infomap_clust) %>%
+  arrange(-n)
 
 total_g %>% activate(nodes) %>%
   as_tibble() %>% View()
 ```
 
+```{r}
+str_c("ciao",
+      "ciao",
+      "ciao2")
+```
+
+
 ggraph
+
 
 ```{r}
 total_g %>%
-  filter(cluster_name %in% c("Demography","Social Statistics","Migration Studies",
-                              "Evaluation","Tourism")) %>%
 ggraph() +
   geom_edge_link(aes(alpha = n), show.legend = FALSE) +
   geom_node_point(aes(colour = macro_cluster),
                   size = 2) +
-#  scale_color_manual(values = c("Mathematical Statistics" = "blue",
-#                                "Demography" = "red",
-#                                "Social Statistics" = "yellow"
-#                                )) +
+  scale_color_manual(values = c("STEM-oriented Statistics" = "violet",
+                                "Social-oriented Statistics" = "yellow"
+                                )) +
   geom_text(x = -1.1, y = 1.85, label = "International Sample",
             size = 5.5, hjust = 0.5, vjust = 0.5) +
   theme_graph() +
@@ -100,26 +127,6 @@ ggraph() +
     legend.title = element_blank()
   )
 
-total_g %>%
-  filter(cluster_name %in% c("Demography","Social Statistics","Migration Studies",
-                              "Evaluation","Tourism")) %>%
-ggraph() +
-  geom_edge_link(aes(alpha = n), show.legend = FALSE) +
-  geom_node_point(aes(colour = cluster_name),
-                  size = 2) +
-#  scale_color_manual(values = c("Mathematical Statistics" = "blue",
-#                                "Demography" = "red",
-#                                "Social Statistics" = "yellow"
-#                                )) +
-  geom_text(x = -1.1, y = 1.85, label = "International Sample",
-            size = 5.5, hjust = 0.5, vjust = 0.5) +
-  theme_graph() +
-  theme(
-    legend.text = element_text(size = 12),
-    legend.position = c(0.05, 0.99),
-    legend.justification = c(0, 1),
-    legend.title = element_blank()
-  )
 ```
 
 ```{r}

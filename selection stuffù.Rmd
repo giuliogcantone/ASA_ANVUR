@@ -1,0 +1,51 @@
+---
+title: "Selection stuff"
+author: "GG Cantone"
+date: "2023-06-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Selection
+
+```{r}
+db$joun_conc %>%
+  distinct() %>%
+  group_by(display_name) %>%
+  filter((display_name %>% tolower() %>% str_detect(c("statistics|quantiat|data|method|demogra|popul|geogra|migr|labo|work|youth|societ|social|sociol|public opinion|media|survey|cultu|educat|touris|evalu")) | any(Concept %in% c("Demography","Statistics"))
+          )) %>%
+  summarise(
+    IN = max(Score[Concept %>% str_detect(
+                  c("Statistics|Data|Demogra|Sociol|Touri|World")
+                  )]),
+    OUT = max(Score[Concept %>% str_detect(c("Chemistry|Pathology|Ecology|Engineering|optimization|Macroeconomics|Microeconomics|Finance|Social psychology"))])) %>%
+  filter(IN > OUT) %>%
+  pull(display_name) -> selected_journals
+  
+filter(db$journals,
+         display_name %in% selected_journals) -> db$journ_selection
+
+selected_journals <- NULL
+```
+
+CHECKS
+
+```{r}
+
+db$joun_conc %>%
+  distinct() %>%
+  filter(str_detect(display_name,"Management Decision")) %>%
+  View()
+
+
+setdiff(union(db$journ_selection$display_name, A$display_name),
+        intersect(db$journ_selection$display_name, A$display_name)) %>%
+tibble(Journal = .,
+       Origin = ifelse(. %in% db$journ_selection$display_name,
+                       "Old",
+                       "New")) -> check
+
+```
