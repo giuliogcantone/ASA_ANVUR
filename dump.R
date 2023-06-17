@@ -39,3 +39,23 @@ db$authors %>%
   ) %>% nrow()
 
 ```
+ù
+
+
+"management, torino" %>% str_detect("(?=.*?manage)(?=.*?turin|torino)")
+
+
+tibble(department = c("economics and engineering", "econom")) %>%
+  mutate(
+    department = department %>% tolower(),
+    D_13 =
+      case_when(
+        department %>%
+          str_detect("engin|medic|chemical|software|energ") ~ 0,
+        department %>%
+          str_detect("econom|statis|busines|impres|manage|finan") ~ 1,
+        TRUE ~ 0
+      ))
+
+sampling_frame %>%
+  filter(title %>% str_detect("Model-based clustering via new p")) -> assign

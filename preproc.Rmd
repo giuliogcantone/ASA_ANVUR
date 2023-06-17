@@ -45,11 +45,11 @@ Paper retrieval
 oa_fetch(
   entity = "works",
   primary_location.source.id = db_j$id,
-  publication_year = c(2019,2022),
+  publication_year = c(2018,2019,2021,2022),
   authorships.institutions.country_code = "IT"
-) -> db_papers_ita
+) -> db_papers_ita_fetched
 
-db_papers_ita %>%
+db_papers_ita_fetched %>%
   filter(!is.na(author)) %>%
   transmute(
     id,
@@ -63,8 +63,10 @@ db_papers_ita %>%
          counts_by_year,
          so_id,
          concepts
-         ) -> db_papers_ita
-
+         ) %>%
+  arrange(year) %>%
+  distinct(title,author,
+           .keep_all = T) -> db_papers_ita
 
 ```
 
@@ -90,35 +92,53 @@ data cleaning filter
 
 ```{r}
 db_papers_ita %>%
-  mutate(D_13 =
+  mutate(
+    department = department %>% tolower(),
+    D_13 =
            case_when(
              department %>%
-               tolower() %>%
+               str_detect("engine|medic|chemical|software|energ") ~ 0,
+             department %>%
                str_detect("econom|statis|busines|impres|manage|finan") ~ 1,
              TRUE ~ 0
            ),
-         department = department %>% tolower(),
          department =
            case_when(
+             department %>% str_detect("cagliari") ~ "Economics and Business, Cagliari",
+             department %>% str_detect("macerata") ~ "Economics and Law, Macerata",
+             department %>% str_detect("(?=.*?manag)(?=.*?venezia)") ~ "Management, Ca Foscari",
+             department %>% str_detect("(?=.*?manag)(?=.*?venice)") ~ "Management, Ca Foscari",
+             department %>% str_detect("(?=.*?manag)(?=.*?foscari)") ~ "Management, Ca Foscari",
+             department %>% str_detect("(?=.*?econom)(?=.*?venezia)") ~ "Economics, Ca Foscari",
+             department %>% str_detect("(?=.*?econom)(?=.*?venice)") ~ "Economics, Ca Foscari",
+             department %>% str_detect("(?=.*?econom)(?=.*?foscari)") ~ "Economics, Ca Foscari",
+             department %>% str_detect("genoa|genova") ~ "Economics and Business, Genua",
              department %>% str_detect("marco fanno") ~ "Economics and Management, Padova",
              department %>% str_detect("(?=.*?econom)(?=.*?padova)") ~ "Economics and Management, Padova",
+             department %>% str_detect("(?=.*?econom)(?=.*?padua)") ~ "Economics and Management, Padova",
              department %>% str_detect("(?=.*?statis)(?=.*?padova)") ~ "Statistical Sciences, Padova",
+             department %>% str_detect("(?=.*?statis)(?=.*?padua)") ~ "Statistical Sciences, Padova",
+             department %>% str_detect("(?=.*?econom)(?=.*?marche)") ~ "Economics and Social Sciences, Ancona Marche",
+             department %>% str_detect("(?=.*?manag)(?=.*?marche)") ~ "Management, Ancona Marche",
              department %>% str_detect("(?=.*?econom)(?=.*?siena)") ~ "Economics and Statistics, Siena",
              department %>% str_detect("(?=.*?busines)(?=.*?siena)") ~ "Business and Law, Siena",
-             department %>% str_detect("(?=.*?school of management)(?=.*?bocconi)") ~ "School of Management, Bocconi",
-             department %>% str_detect("(?=.*?finance)(?=.*?bocconi)") ~ "Finance, Bocconi",
+             department %>% str_detect("bocconi") ~ "Bocconi",
+             department %>% str_detect("(?=.*?financ)(?=.*?bocconi)") ~ "Finance, Bocconi",
              department %>% str_detect("(?=.*?statis)(?=.*?padova)") ~ "Statistical Sciences, Padova",
              department %>% str_detect("(?=.*?econom)(?=.*?turin)") ~ "Economics and Statistics, University of Turin",
-             department %>% str_detect("(?=.*?management)(?=.*?turin)") ~ "Management, University of Turin",
+             department %>% str_detect("(?=.*?econom)(?=.*?torino)") ~ "Economics and Statistics, University of Turin",
+             department %>% str_detect("(?=.*?manage)(?=.*?turin)") ~ "Management, University of Turin",
+             department %>% str_detect("(?=.*?manage)(?=.*?torino)") ~ "Management, University of Turin",
              department %>% str_detect("(?=.*?econom)(?=.*?florence)") ~ "Economics, Florence",
-             department %>% str_detect("(?=.*?statist)(?=.*?florence)") ~ "Statistics and Computer Science, Florence",
+             department %>% str_detect("(?=.*?econom)(?=.*?firenze)") ~ "Economics, Florence",
+             department %>% str_detect("(?=.*?statis)(?=.*?firenze)") ~ "Statistics and Computer Science, Florence",
+             department %>% str_detect("(?=.*?statis)(?=.*?florence)") ~ "Statistics and Computer Science, Florence",
              department %>% str_detect("(?=.*?econom)(?=.*?bologna)") ~ "Economics, Bologna",
              department %>% str_detect("(?=.*?manage)(?=.*?bologna)") ~ "Management, Bologna",
              department %>% str_detect("(?=.*?statis)(?=.*?bologna)") ~ "Statistical Sciences, Bologna",
              department %>% str_detect("(?=.*?econom)(?=.*?sapienza)") ~ "Economics, Sapienza",
              department %>% str_detect("(?=.*?manage)(?=.*?sapienza)") ~ "Management, Sapienza",
              department %>% str_detect("(?=.*?statis)(?=.*?sapienza)") ~ "Statistical Sciences, Sapienza",
-             department %>% str_detect("(politecnico).*?(milano)") ~ "Politecnico di Milano",
              department %>% str_detect("udine") ~ "Economics and Statistics, Udine",
              department %>% str_detect("messina") ~ "Economics, Messina",
              department %>% str_detect("trento") ~ "Economics and Management, Trento",
@@ -128,17 +148,66 @@ db_papers_ita %>%
              department %>% str_detect("brescia") ~ "Economics and Management, Brescia",
              department %>% str_detect("(?=.*?management)(?=.*?vergata)") ~ "Management and Law, Tor Vergata",
              department %>% str_detect("(?=.*?econom)(?=.*?vergata)") ~ "Economics, Tor Vergata",
+             department %>% str_detect("(?=.*?business)(?=.*?verona)") ~ "Business Administration, Verona",
+             department %>% str_detect("(?=.*?econom)(?=.*?verona)") ~ "Economics, Verona",
              department %>% str_detect("(?=.*?econom)(?=.*?palermo)") ~ "Economics, Business and Statistics, Palermo",
              department %>% str_detect("biagi|modena") ~ "Economics, Modena and Reggio Emilia",
              department %>% str_detect("catania") ~ "Economics and Business, Catania",
+             department %>% str_detect("urbino") ~ "Economics, Society and Politics, Urbino",
+             department %>% str_detect("parma") ~ "Economics, Society and Politics, Parma",
+             department %>% str_detect("pavia") ~ "Economics, Society and Politics, Pavia",
+             department %>% str_detect("(?=.*?econom)(?=.*?sassari)") ~ "Economics and Business, Sassari",
+             department %>% str_detect("(?=.*?manage)(?=.*?bari)") ~ "Economics, Management and Business, Bari",
+             department %>% str_detect("(?=.*?finan)(?=.*?bari)") ~ "Economics and Finance, Bari",
+             department %>% str_detect("(?=.*?manage)(?=.*?luiss)") ~ "Economics and Management, LUISS",
+             department %>% str_detect("(?=.*?finan)(?=.*?luiss)") ~ "Economics and Finance, LUISS",
+             department %>% str_detect("sant'anna") ~ "Sant'Anna School of Management",
+             department %>% str_detect("pisa") ~ "Economics and Management, Pisa",
+             department %>% str_detect("bozen|bolzano") ~ "Economics and Management, Bozen-Bolzano",
+             department %>% str_detect("roma tre") ~ "Economics, Roma Tre",
+             department %>% str_detect("(?=.*?manage)(?=.*?salerno)") ~ "Management and Innovation Systems, Salerno",
+             department %>% str_detect("(?=.*?statis)(?=.*?salerno)") ~ "Economics and Statistics, Salerno",
+             department %>% str_detect("bicocca") ~ "School of Economics and Statistics, Bicocca",
+             department %>% str_detect("(?=.*?statis)(?=.*?federico ii)") ~ "Economics and Statistics, Federico II",
+             department %>% str_detect("(?=.*?manage)(?=.*?federico ii)") ~ "Economics, Management, Institutions, Federico II",
+             department %>% str_detect("parthenope") ~ "Parthenope School of Economics and Law",
+             department %>% str_detect("campania|vanvitelli") ~ "Campania Vanvitelli",
+             department %>% str_detect("kore|enna") ~ "Enna Kore",
+             department %>% str_detect("salento|lecce") ~ "Economics, Lecce Salento",
+             department %>% str_detect("insubria|varese") ~ "Economics, Varese Insubria",
+             department %>% str_detect("cassino") ~ "Economics and Law, Cassino",
+             department %>% str_detect("iulm") ~ "Business, Law, Economics, IULM",
+             department %>% str_detect("politecnico di milano") ~ "School of Management, Politecnico di Milano",
+             department %>% str_detect("bergamo") ~ "University of Bergamo",
+             department %>% str_detect("chieti|pescara|annunzio") ~ "University of Chieti-Pescara",
+             department %>% str_detect("calabria") ~ "University of Calabria",
              TRUE ~ department
              )
          ) -> db_papers_ita_f
 
 db_papers_ita_f %>%
-  filter(D_13 == 1) %>%
-  count(department) %>%
+      filter(D_13 == 1) %>%
+      count(department) %>%
   arrange(-n) -> IN
+
+db_papers_ita_f %>%
+  filter(department %in% c(IN$department[1:64])
+         ) -> sampling_frame
+
+db_papers_ita_f %>%
+  filter(department %in% c(IN$department[1:64])
+         ) %>%
+  count(department,
+        author) %>%
+  count(department) %>%
+  rename(n_authors = n) %>%
+  left_join(
+    db_papers_ita_f %>%
+      filter(D_13 == 1) %>%
+      count(department)) %>%
+  rename(n_authorships = n) %>%
+  mutate(ratio = log(n_authorships) / log(n_authors)) %>%
+  arrange(-ratio) -> ratio
 
 db_papers_ita %>%
   filter(D_13 == 0) %>%
@@ -148,21 +217,45 @@ db_papers_ita %>%
 ```
 
 
-Italians 
+Sampling all concepts and making a proximity matrix
 
 ```{r}
+oa_fetch(
+  entity = "concepts",
+  level = c(1)
+) -> concepts
 
+concepts %>%
+  rename(concept = display_name,
+         rel=related_concepts) %>%
+  select(concept,
+         level,
+         rel) %>%
+  unnest(rel,
+         names_sep = "_") %>%
+  rename(rel_concept = rel_display_name) %>%
+  select(concept,
+         level,
+         rel_id,
+         rel_concept,
+         rel_level,
+         rel_score,
+         ) %>%
+  filter(rel_level == 1) %>%
+  mutate(score_asym = rel_score / sum(rel_score),
+         .by = concept) %>%
+  mutate(score_asym = score_asym / max(score_asym)) %>%
+  filter(concept != "Combinatorial chemistry") %>%
+  arrange(concept,rel_concept) %>%
+  select(concept, rel_concept, score_asym) %>%
+  pivot_wider(names_from = rel_concept,
+              values_from = score_asym,
+              values_fill = 0
+              ) %>%
+  select(concept, sort(names(.)[-1])) %>%
+  select(-concept) %>%
+  as.matrix() -> concepts_d_matrix
 
-
-db$authors_ITA$au_display_name %>% unique() %>% length()
-db$authors_ITA$id %>% unique() %>% length()
-db$authors_ITA$journal %>% unique() %>% length()
-
-db$authors_ITA %>%
-  summarise(
-    n = n(),
-    .by = c(au_display_name)
-    ) %>% arrange(-n) %>%
-  head(40)
+colnames(concepts_d_matrix) -> row.names(concepts_d_matrix)
+diag(1)
 ```
-

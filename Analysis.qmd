@@ -1,0 +1,43 @@
+---
+title: "Analysis"
+author: "Cantone"
+format:
+editor:
+---
+
+## Operantions Sampling Frame
+
+Joining the journal concepts to the sampling frame
+
+```{r}
+sampling_frame <- db_papers_ita_f %>%
+  filter(department %in% IN$department,
+         D_13 == 1) %>%
+  left_join(db_j %>% select(journal = display_name,
+                            j_concepts = x_concepts)) %>%
+  select(title, journal,author_contribution,year,concepts,j_concepts,department) %>%
+  arrange(journal)
+```
+
+prova
+
+```{r}
+sampling_frame %>%
+  filter(department == "Economics and Business, Catania") %>%
+  unnest(c(concepts),
+         names_sep = "_") %>%
+  filter(concepts_level == 1) %>%
+  transmute(title,journal,author_contribution,year,
+            concept = concepts_display_name,
+            p = concepts_score,
+            j_concepts,department) %>%
+  unnest(c(j_concepts)) %>%
+  filter(level == 1) %>%
+  transmute(title,journal,author_contribution,year,
+            concept,p,
+            j_concept = display_name,
+            j_p = score,
+            department) %>%
+  filter(p > 0,
+         j_p > 0)
+```
