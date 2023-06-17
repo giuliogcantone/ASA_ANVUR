@@ -5,13 +5,23 @@ format:
 editor:
 ---
 
+```{r setup, include=FALSE}
+pacman::p_load(
+  tidyverse,
+  openalexR,
+  readxl,
+  nplyr,
+  arrow
+)
+```
+
 ## Operantions Sampling Frame
 
 Joining the journal concepts to the sampling frame
 
 ```{r}
 sampling_frame <- db_papers_ita_f %>%
-  filter(department %in% IN$department,
+  filter(department %in% IN$department[1:64],
          D_13 == 1) %>%
   left_join(db_j %>% select(journal = display_name,
                             j_concepts = x_concepts)) %>%

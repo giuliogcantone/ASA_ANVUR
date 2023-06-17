@@ -83,6 +83,7 @@ db_papers_ita %>%
   select(id,journal,title,publication_date,year,references_list,cited_by_count,counts_by_year,so_id,concepts,
          author = au_display_name,
          author_contribution,
+         au_orcid,
          au_id,
          institution = institution_display_name,
          department = au_affiliation_raw) -> db_papers_ita
@@ -195,18 +196,21 @@ db_papers_ita_f %>%
          ) -> sampling_frame
 
 db_papers_ita_f %>%
-  filter(department %in% c(IN$department[1:64])
+  filter(department %in% c(IN$department[1:64]),
+         !au_orcid %>% is.na()
          ) %>%
   count(department,
-        author) %>%
+        au_orcid) %>% View()
   count(department) %>%
   rename(n_authors = n) %>%
   left_join(
     db_papers_ita_f %>%
-      filter(D_13 == 1) %>%
+        filter(department %in% c(IN$department[1:64]),
+         !au_orcid %>% is.na()
+         ) %>%
       count(department)) %>%
   rename(n_authorships = n) %>%
-  mutate(ratio = log(n_authorships) / log(n_authors)) %>%
+  mutate(ratio = n_authorships / n_authors) %>%
   arrange(-ratio) -> ratio
 
 db_papers_ita %>%
