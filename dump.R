@@ -1,3 +1,50 @@
+original_tibble <- tribble(
+  ~ID, ~type, ~name, ~p,
+  1,   "Journal", "a",   1,
+  1,   "Journal", "b",   2,
+  1,   "Journal", "c",   3,
+  1,   "Paper",   "b",   4,
+  1,   "Paper",   "c",   5,
+  1,   "Paper",   "d",   6,
+  2,   "Journal", "a",   1,
+  2,   "Journal", "b",   2,
+  2,   "Paper",   "a",   3,
+  2,   "Paper",   "c",   4,
+  2,   "Paper",   "f",   5
+)
+
+original_tibble %>%
+  complete(ID, type, name, fill = list(p = 0))
+
+
+  pivot_wider(
+    names_from = type,
+    values_from = p,
+    names_prefix = "p_",
+    values_fill = 0
+  )
+
+# Generate the derived tibble
+original_tibble %>%
+  filter(type == "Paper") %>%
+  rename(Paper = name, Paper_p = p) %>%
+  select(-type) %>%
+  right_join(original_tibble %>%
+               filter(type == "Journal") %>%
+               rename(Journal = name, Journal_p = p) %>%
+               select(-type), by = c("ID","Journal") %>%
+  mutate(Paper_p = ifelse(is.na(Paper_p), 0, Paper_p),
+         Journal_p = ifelse(is.na(Journal_p), 0, Journal_p)) %>%
+  select(ID, Paper, Journal, Paper_p, Journal_p) %>% View()
+
+
+
+
+
+
+
+
+
 
 db$journals %>%
   filter(!is.na(x_concepts)) %>%

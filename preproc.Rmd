@@ -246,12 +246,18 @@ concepts %>%
          rel_score,
          ) %>%
   filter(rel_level == 1) %>%
-  mutate(score_asym = rel_score / sum(rel_score),
+  mutate(score_asym = rel_score / max(rel_score),
          .by = concept) %>%
   mutate(score_asym = score_asym / max(score_asym)) %>%
-  filter(concept != "Combinatorial chemistry") %>%
+  select(concept, rel_concept, score_asym) -> concepts_d_matrix
+
+concepts_d_matrix %>%
+  add_row(concept = setdiff(concepts$display_name,concepts_d_matrix$rel_concept),
+          rel_concept = setdiff(concepts$display_name,concepts_d_matrix$rel_concept),
+          score_asym = 1) -> concepts_d_matrix
+
+concepts_d_matrix %>%
   arrange(concept,rel_concept) %>%
-  select(concept, rel_concept, score_asym) %>%
   pivot_wider(names_from = rel_concept,
               values_from = score_asym,
               values_fill = 0
@@ -260,6 +266,8 @@ concepts %>%
   select(-concept) %>%
   as.matrix() -> concepts_d_matrix
 
+dim(concepts_d_matrix)
+
 colnames(concepts_d_matrix) -> row.names(concepts_d_matrix)
-diag(1)
+diag(concepts_d_matrix) <- 1
 ```

@@ -11,7 +11,9 @@ pacman::p_load(
   openalexR,
   readxl,
   nplyr,
-  arrow
+  arrow,
+  robustrao,
+  ggExtra
 )
 ```
 
@@ -25,29 +27,130 @@ sampling_frame <- db_papers_ita_f %>%
          D_13 == 1) %>%
   left_join(db_j %>% select(journal = display_name,
                             j_concepts = x_concepts)) %>%
-  select(title, journal,author_contribution,year,concepts,j_concepts,department) %>%
+  select(id, journal,author_contribution,year,concepts,j_concepts,department) %>%
+  mutate(year = case_when(
+    year < 2020 ~ "PRE",
+    year > 2020 ~ "POST",
+  )) %>%
   arrange(journal)
+
+sampling_frame %>% unique() %>% length()
 ```
 
-prova
+Rao-Stirling
 
 ```{r}
 sampling_frame %>%
-  filter(department == "Economics and Business, Catania") %>%
   unnest(c(concepts),
          names_sep = "_") %>%
-  filter(concepts_level == 1) %>%
-  transmute(title,journal,author_contribution,year,
+    filter(concepts_score > 0,
+           concepts_level== 1) %>%
+  transmute(id,
+            concept = concepts_display_name,
+            p = concepts_score) %>%
+  distinct(id,concept,
+           .keep_all = T) %>%
+  mutate(p = p/sum(p),
+         .by = id) %>%
+  arrange(concept) %>%
+    mutate(n_c = n(),
+           .by = id) %>%
+  summarise(RS =
+              ifelse(first(n_c) > 1,
+                     RaoStirling(p,
+                                 concepts_d_matrix[
+                                   (row.names(concepts_d_matrix) %in% (concept %>% unique())),
+                                   (row.names(concepts_d_matrix) %in% (concept %>% unique()))
+                                   ]
+                                 ),
+                     0),
+            .by = id) %>%
+  mutate(LC = 1/(1-RS)) -> diversity_db
+```
+
+Surprise
+
+```{r}
+sampling_frame %>%
+  unnest(c(concepts),
+         names_sep = "_") %>%
+      filter(
+        concepts_score > 0,
+        concepts_level==1) %>%
+  transmute(id,
             concept = concepts_display_name,
             p = concepts_score,
-            j_concepts,department) %>%
-  unnest(c(j_concepts)) %>%
-  filter(level == 1) %>%
-  transmute(title,journal,author_contribution,year,
-            concept,p,
-            j_concept = display_name,
-            j_p = score,
-            department) %>%
-  filter(p > 0,
-         j_p > 0)
+            level = "paper"
+            ) %>%
+  distinct(id,concept,
+           .keep_all = T) %>%
+  add_row(
+    sampling_frame %>%
+  unnest(c(j_concepts),
+         names_sep = "_") %>%
+      filter(
+        j_concepts_score > 0,
+        j_concepts_level==1) %>%
+  transmute(id,
+            concept = j_concepts_display_name,
+            p = j_concepts_score,
+                        level = "journal"
+            ) %>%
+  distinct(id,concept,
+           .keep_all = T)
+  ) %>%
+   mutate(p = p/sum(p),
+         .by = c(id,level)) %>%
+  group_by(id) %>%
+  complete(level, concept, fill = list(p = 0)) %>%
+  ungroup -> oddity_db
+  
+oddity_db %>%
+  filter(level == "paper") %>%
+  select(-level) %>%
+  full_join(oddity_db %>%
+              filter(level == "journal") %>%
+              rename(j_concept = concept, j_p = p) %>%
+              select(-level), by = "id") %>%
+  select(id, concept, j_concept, p, j_p) %>%
+  mutate(concept = ifelse(concept %>% is.na(),j_concept,concept),
+         j_concept = ifelse(j_concept %>% is.na(),concept,j_concept),
+         p = ifelse(concept %>% is.na(),0,p),
+         j_p = ifelse(j_concept %>% is.na(),0,j_p)) %>%
+  mutate(d = map2_dbl(.x = concept,
+                      .y = j_concept,
+                      ~concepts_d_matrix[.y,.x])
+  ) -> oddity_db
+
+oddity_db %>%
+  summarise(Surprise = sum((j_p - p)^2 *d),
+            .by = id) -> oddity_db
+```
+
+Jack-in
+
+```{r}
+
+ggMarginal(
+sampling_frame %>%
+  left_join(diversity_db) %>%
+  left_join(oddity_db) %>%
+  mutate(COVID19 = factor(year, levels = c("PRE","POST"))) %>%
+  summarise(Diversity = sum(LC*author_contribution, na.rm = T)/
+              sum(author_contribution),
+            Surprise = sum(Surprise*author_contribution, na.rm = T)/
+              sum(author_contribution),
+            .by = c(department,COVID19)
+            ) %>%
+  ggplot(aes(Diversity,
+             Surprise)) +
+  geom_point(aes(color = COVID19)) +
+  xlab("Average Diversity") +
+  ylab("Avg. Surprise") +
+  scale_color_viridis_d(option = "D",
+                        begin = 1,
+                        end = 0) +
+  theme_test(),
+groupColour = T
+)
 ```
