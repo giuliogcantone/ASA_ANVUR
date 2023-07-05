@@ -49,6 +49,8 @@ oa_fetch(
   authorships.institutions.country_code = "IT"
 ) -> db_papers_ita_fetched
 
+db_papers_ita_fetched$id %>% unique() %>% length()
+
 db_papers_ita_fetched %>%
   filter(!is.na(author)) %>%
   transmute(

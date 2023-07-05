@@ -131,6 +131,21 @@ Jack-in
 
 ```{r}
 
+
+sampling_frame %>%
+  left_join(diversity_db) %>%
+  left_join(oddity_db) %>%
+  mutate(COVID19 = factor(year, levels = c("PRE","POST"))) %>%
+  summarise(Diversity = sum(LC*author_contribution, na.rm = T)/
+              sum(author_contribution),
+            Surprise = sum(Surprise*author_contribution, na.rm = T)/
+              sum(author_contribution),
+            .by = c(department,COVID19)
+            ) %>%
+  summarise(
+    corr = cor(Diversity,Surprise)
+  )
+
 ggMarginal(
 sampling_frame %>%
   left_join(diversity_db) %>%
@@ -145,6 +160,8 @@ sampling_frame %>%
   ggplot(aes(Diversity,
              Surprise)) +
   geom_point(aes(color = COVID19)) +
+  geom_smooth(method = "lm",
+              color = "red") +
   xlab("Average Diversity") +
   ylab("Avg. Surprise") +
   scale_color_viridis_d(option = "D",
