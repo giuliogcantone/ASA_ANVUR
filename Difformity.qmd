@@ -89,3 +89,7 @@ More radically, instead of assuming that papers are the objects, it is possible 
     -   Nevertheless, a very similar operation can be performed over the semantics of the paper, and it would still catch how the paper is trying to integrate disparate sources of concepts, data, theories, etc.
 
 ## Example
+
+```{r}
+
+```
