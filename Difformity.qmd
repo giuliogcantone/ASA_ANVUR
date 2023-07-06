@@ -78,15 +78,13 @@ where $d_{i,j}$ is a measure of dissimilarity between the trait $i$ and the trai
 
     -   Scores are allocations of disciplinarity
 
-This is not the only possible homemorphism. For example, papers can be still the objects (analytical units), then authors can be the classes since they satisfy the assumption to be a class.
+This is not the only possible homemorphism. For example, papers can be still the objects (analytical units), then authors can be the classes.
 
 More radically, instead of assuming that papers are the objects, it is possible to assume that authors are objects and their departments in a specific fixed time point are their class.
 
 #### Notes on the homeomorphism
 
--   Disciplines, conventionally, DO NOT satisfy the condition to be classes since many objects can be multidisciplinary
-
--   Disciplines are defined as observable traits. In reality they act more as labels. The origin of this labelisation (i.e. the classification scheme) is not trivial.
+-   Disciplines are defined as observable traits, not as classes. In reality they act more as labels. The origin of this labelisation (i.e. the classification scheme) is not trivial.
 
 -   Canonically, disciplinary labelisation is operated through the reference lists of papers. This operation is understood as an observation of what the paper is intending to cognitively integrate.
 
