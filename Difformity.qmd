@@ -4,6 +4,10 @@ format: html
 editor: visual
 ---
 
+```{r}
+library(tidyverse)
+```
+
 ## What is a index of Difformity
 
 It is a index that signals how much a $\xi$ object of class $k$ differs from the typical $\langle \xi_k \rangle$ object of its own class $k$. Through this approssimation, this index indicates how the object is difform from its own class.
@@ -44,7 +48,7 @@ The $k$ class
 
 Under these conditions, to simplify notations, it is assumed that
 
--    $(i_{\langle \xi_k \rangle},p_{\langle \xi_k \rangle})$ can be recalled directly as $(i_{k},p_{k})$
+-   $(i_{\langle \xi_k \rangle},p_{\langle \xi_k \rangle})$ can be recalled directly as $(i_{k},p_{k})$
 
 ## Operation
 
@@ -59,7 +63,7 @@ A first operation is to identify the set $C_\xi = \cup (i_\xi,i_k)$
 Difformity is defined as follow:
 
 $$
-\sum\limits_{i,j \in C_\xi } (|p_{i,k} - p_{i,\xi}|) \cdot (|p_{j,k} - p_{j,\xi}|) \cdot d_{i,j}
+\sum\limits_{i,j \in C_\xi } (|p_{i,k} - p_{i,\xi}|) \cdot (|p_{j,k} - p_{j,\xi}|) \cdot \frac{d_{i,j}}{2}
 $$
 
 where $d_{i,j}$ is a measure of dissimilarity between the trait $i$ and the trait $j$, such that $d_{i,i}$ = 0.
@@ -90,6 +94,162 @@ More radically, instead of assuming that papers are the objects, it is possible 
 
 ## Example
 
+-   Let have a collection of two papers from the same journal. Let call the papers "Paper 1" and "Paper 2".
+
+-   The journal is called "International Journal of Pomponomics" or just "IJP".
+
+-   According to HAL GPT, a friendly Artificial Intelligence, it is fair to say that a nice representation of what IJP deals with is the following:
+
+    -   Pomponomics: 66%
+
+    -   Junkology: 25%
+
+    -   Enneagrammatics: 9%
+
 ```{r}
 
+ex_Journals <- tibble(
+  level = "k",
+  k_Name = "IJP",
+  Discipline =
+    c("Pomponomics",
+      "Junkology",
+      "Enneagrammatics"),
+  p = c(.66,.25,.9)
+)
+
+ex_Journals
 ```
+
+Let's see now how HAL GPT will label the papers:
+
+```{r}
+
+ex_Papers <- tibble(
+  level = "xi",
+  xi_Name = "Paper 1",
+  Discipline =
+    c("Pomponomics",
+      "Junkology"),
+  p = c(.5,.5),
+  k_Name = "IJP"
+) %>%
+  add_row(
+    tibble(
+      level = "xi",
+  xi_Name = "Paper 2",
+  Discipline =
+    c("Pomponomics",
+      "Junkology",
+      "Enneagrammatics",
+      "Science of Science"),
+  p = c(.25,.25,.25,.25),
+  k_Name = "IJP"
+)
+  )
+
+ex_Papers
+```
+
+A convenient way to store all this information is the following long format:
+
+```{r}
+ex_Papers %>%
+  add_row(ex_Journals %>% add_column(xi_Name = "Paper 1")) %>%
+  add_row(ex_Journals %>% add_column(xi_Name = "Paper 2")) -> ex_Papers
+  
+  ex_Papers %>% arrange(xi_Name)
+```
+
+The dataset is now re-formatted again to make it easier a subtraction
+
+```{r}
+ex_Papers %>%
+  pivot_wider(names_from = level,
+              values_from = p,
+              values_fill = 0) -> ex_Papers
+
+ex_Papers %>%
+  mutate(diff = abs(k - xi)) -> results
+results
+```
+
+## Final operations
+
+### Dissimilarity matrix
+
+In literature, the following matrix of dissimilarities is found (actually not a matrix in this format):
+
+```{r}
+d = crossing(i = ex_Papers$Discipline %>% unique(),
+             j = ex_Papers$Discipline %>% unique()) %>%
+  mutate(d = ifelse(i == j,                     
+                    0,                     
+                    .5   
+                    ))
+d
+```
+
+### Difformity
+
+```{r}
+results %>%
+  transmute(xi_Name,
+            Discipline) %>%
+  group_by(xi_Name) %>%
+  summarize(crossed = list(crossing(Discipline, Discipline))) %>%
+  unnest(crossed) %>%
+  rename(
+    i = Discipline...1,
+    j = Discipline...2
+  ) %>%
+  left_join(
+    results %>% transmute(
+      xi_Name,
+      i = Discipline,
+      diff_i = diff
+    )
+  ) %>%
+    left_join(
+    results %>% transmute(
+      xi_Name,
+      j = Discipline,
+      diff_j = diff
+  )
+    ) %>%
+  left_join(
+    d
+  ) -> final_tibble
+
+final_tibble
+```
+
+Finally we can measure the difformity for the two papers!
+
+```{r}
+final_tibble %>%
+  summarise(
+    Difformity = sum(diff_i * diff_j * d/2),
+    .by = "xi_Name"
+  ) %>%
+  mutate(
+    True_Difformity =
+      1 / (1 - Difformity)
+  )
+```
+
+## Criticisms
+
+$p\;|\sum p = 1$ makes sense as a noteworthy statistical distribution.
+
+Instead, $| p_k - p_\xi|$ is statistically complex and may need further corrections to be adjusted into a True measure. For example,
+
+-   while Rao-Stirling only converges to 1
+
+-   Difformity can reach 1 when
+
+    -   object and class have no traits in common,
+
+    -   all of their traits have $d_{ij} = 1$
+
+-   In this case True Difformity is Infinite.
