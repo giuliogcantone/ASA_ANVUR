@@ -240,6 +240,8 @@ final_tibble %>%
 
 ## Criticisms
 
+### Mathematical concerns
+
 $p\;|\sum p = 1$ makes sense as a noteworthy statistical distribution.
 
 Instead, $| p_k - p_\xi|$ is statistically complex and may need further corrections to be adjusted into a True measure. For example,
@@ -253,3 +255,65 @@ Instead, $| p_k - p_\xi|$ is statistically complex and may need further correcti
     -   all of their traits have $d_{ij} = 1$
 
 -   In this case True Difformity is Infinite.
+
+### Theoretical concerns
+
+The index is very similar to Rao, however in the Stirling's interpretation of Rao, Rao compunds three factors: Richness, Balance and Disparity.
+
+These factors make no sense for the index of Difformity. Not only in semantics, but directly in the mathematical proprieties of the index.
+
+For example, let's imagine the case for
+
+-   Richness being minimal,
+
+-   while Balance and Disparity being maximal.
+
+This is the case for $\xi$ holding only 2 traits
+
+-   $i_1 = .5$
+
+-   $i_2 = .5$
+
+-   $d_{i_1,i_2} = 1$
+
+In this case, \$D\_{RS} = .5\$, which means that
+
+-   since $\lim RS = 1$
+
+-   then Richness counts for half of the whole index. at these conditions
+
+For Difformity, minimising Richness while maximising Disparity requires has 2 interpretations:
+
+-   Since richness is minimal, $k$ and $\xi$ have only one trait, and they share it. By imposing $\sum p = 1$ , then Balance is necessarily maximal and Difformity will be minimal at 0, independently by Disparity.
+
+-   $k$ and $\xi$ have only one trait, but these are two different traits ($i$ and $j$), and very dissimilar (Disparity is maximal). Balance is again forced to be maximal can be maximal by $p_i = p_j = 1$. In this case, Difformity will be maximal at $1$.
+
+So it is demonstrated that in its current definition, Difformity is independent by Richness.
+
+#### Solution
+
+Index of difformity can be forced to behave exactly as Rao-Stirling with a re-normalisation
+
+$$
+\phi_{i,(k,\xi)} = \frac{
+|p_{i,k} - p_{i,\xi}|
+}{\sum_i 
+|p_{i,k} - p_{i,\xi}|
+}
+$$
+
+$$
+\text{Difformity} = \sum\limits_{i,j \in C_\xi } \phi_i \cdot \phi_j \cdot d_{i,j}
+$$
+
+Forcing that $\phi = 0$ when $\sum_i |p_{i,k} - p_{i,\xi}| = 0$
+
+### Methodological concerns
+
+Let's assume the case for a journal characterised by only one discipline: Political Economics.
+
+In this journal there is a paper characterised by only one discipline: Economical Politics.
+
+In reality, the two are the same things. Yet without accounting for Disparity, the index would signal the maximal Difformity. However, if $d = 0$ as it should be, then Difformity is 0.
+
+In other terms, the index is highly sensitive to $d$.
