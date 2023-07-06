@@ -113,7 +113,7 @@ ex_Journals <- tibble(
     c("Pomponomics",
       "Junkology",
       "Enneagrammatics"),
-  p = c(.66,.25,.9)
+  p = c(.66,.25,.09)
 )
 
 ex_Journals
