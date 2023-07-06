@@ -76,7 +76,7 @@ where $d_{i,j}$ is a measure of dissimilarity between the trait $i$ and the trai
 
 -   Disciplines are traits
 
-    -   Scores are apportions of disciplinarity
+    -   Scores are allocations of disciplinarity
 
 This is not the only possible homemorphism. For example, papers can be still the objects (analytical units), then authors can be the classes since they satisfy the assumption to be a class.
 
