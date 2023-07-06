@@ -1,10 +1,10 @@
 ---
-title: "nonconformity"
-format: html
+title: "Difformity Index"
+format: pdf
 editor: visual
 ---
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 ```
 
@@ -307,6 +307,56 @@ $$
 $$
 
 Forcing that $\phi = 0$ when $\sum_i |p_{i,k} - p_{i,\xi}| = 0$
+
+```{r}
+results %>%
+  mutate(phi = diff/sum(diff),
+         .by = "xi_Name") -> results
+
+results %>%
+  transmute(xi_Name,
+            Discipline) %>%
+  group_by(xi_Name) %>%
+  summarize(crossed = list(crossing(Discipline, Discipline))) %>%
+  unnest(crossed) %>%
+  rename(
+    i = Discipline...1,
+    j = Discipline...2
+  ) %>%
+  left_join(
+    results %>% transmute(
+      xi_Name,
+      i = Discipline,
+      diff_i = diff,
+      phi_i = phi
+    )
+  ) %>%
+    left_join(
+    results %>% transmute(
+      xi_Name,
+      j = Discipline,
+      diff_j = diff,
+      phi_j = phi
+  )
+    ) %>%
+  left_join(
+    d
+  ) -> final_tibble
+  
+
+final_tibble %>%
+  summarise(
+    Difformity = sum(diff_i * diff_j * d/2),
+    Difformity_alt = sum(phi_i * phi_j * d),
+    .by = "xi_Name"
+  ) %>%
+  mutate(
+    True_Difformity =
+      1 / (1 - Difformity),
+    True_Difformity_alt =
+      1 / (1 - Difformity_alt)
+  )
+```
 
 ### Methodological concerns
 
