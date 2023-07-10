@@ -197,6 +197,17 @@ db_papers_ita_f %>%
   filter(department %in% c(IN$department[1:64])
          ) -> sampling_frame
 
+db_papers_ita %>%
+  filter(D_13 == 0) %>%
+  count(department) %>%
+  arrange(-n) -> OUT
+
+```
+
+Diagnostic
+
+```{r}
+
 db_papers_ita_f %>%
   filter(department %in% c(IN$department[1:64]),
          !au_orcid %>% is.na()
@@ -214,11 +225,6 @@ db_papers_ita_f %>%
   rename(n_authorships = n) %>%
   mutate(ratio = n_authorships / n_authors) %>%
   arrange(-ratio) -> ratio
-
-db_papers_ita %>%
-  filter(D_13 == 0) %>%
-  count(department) %>%
-  arrange(-n) -> OUT
 
 ```
 

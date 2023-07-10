@@ -41,6 +41,7 @@ Rao-Stirling
 
 ```{r}
 sampling_frame %>%
+  select(-j_concepts) %>%
   unnest(c(concepts),
          names_sep = "_") %>%
     filter(concepts_score > 0,
@@ -54,7 +55,46 @@ sampling_frame %>%
          .by = id) %>%
   arrange(concept) %>%
     mutate(n_c = n(),
-           .by = id) %>%
+           .by = id) -> sampling_frame_RS
+
+```
+RS part second
+
+```{r}
+sampling_frame_RS %>%
+summarize(crossed = list(crossing(concept, concept)),
+          .by = id) %>%
+  unnest(crossed) %>%
+  rename(
+    i = concept...1,
+    j = concept...2
+  ) %>%
+  left_join(
+    sampling_frame_RS %>% transmute(
+      id,
+      i = concept,
+      p_i = p,
+      n_c
+    )
+  ) %>%
+    left_join(
+    sampling_frame_RS %>% transmute(
+      id,
+      j = concept,
+      p_j = p,
+      n_c
+  )
+  ) %>%
+  mutate(d = map2_dbl(i,j,~1 - concepts_d_matrix[.y, .x])) %>%
+  summarise(.by = id,
+            RS = sum(p_i * p_j * d),
+            True_RS = 1 / (1 - RS)) -> diversity_db
+```
+
+
+Alternative DIversity
+
+```{r}
   summarise(RS =
               ifelse(first(n_c) > 1,
                      RaoStirling(p,
@@ -68,7 +108,8 @@ sampling_frame %>%
   mutate(LC = 1/(1-RS)) -> diversity_db
 ```
 
-Surprise
+
+Difformity
 
 ```{r}
 sampling_frame %>%
@@ -110,21 +151,47 @@ oddity_db %>%
   select(-level) %>%
   full_join(oddity_db %>%
               filter(level == "journal") %>%
-              rename(j_concept = concept, j_p = p) %>%
+              rename(k = concept, p_k = p) %>%
               select(-level), by = "id") %>%
-  select(id, concept, j_concept, p, j_p) %>%
-  mutate(concept = ifelse(concept %>% is.na(),j_concept,concept),
-         j_concept = ifelse(j_concept %>% is.na(),concept,j_concept),
-         p = ifelse(concept %>% is.na(),0,p),
-         j_p = ifelse(j_concept %>% is.na(),0,j_p)) %>%
-  mutate(d = map2_dbl(.x = concept,
-                      .y = j_concept,
-                      ~concepts_d_matrix[.y,.x])
-  ) -> oddity_db
+  transmute(id, x = concept, k, p_x = p, p_k) %>%
+  mutate(x = ifelse(x %>% is.na(),k,x),
+         k = ifelse(k %>% is.na(),x,k),
+         p_x = ifelse(x %>% is.na(),0,p_x),
+         p_k = ifelse(k %>% is.na(),0,p_k)
+  ) %>%
+  filter(x == k) -> oddity_db
 
 oddity_db %>%
-  summarise(Surprise = sum((j_p - p)^2 *d),
-            .by = id) -> oddity_db
+  mutate(diff = abs(p_k - p_x)) %>%
+  mutate(.by = id,
+         n_diff = diff/sum(diff)) -> oddity_db
+
+oddity_db %>%
+summarize(crossed = list(crossing(x, x)),
+          .by = id) %>%
+  unnest(crossed) %>%
+  rename(
+    i = x...1,
+    j = x...2
+  ) %>%
+  left_join(
+    oddity_db %>% transmute(
+      id,
+      i = x,
+      n_diff_i = n_diff
+    )
+  ) %>%
+    left_join(
+    oddity_db %>% transmute(
+      id,
+      j = x,
+      n_diff_j = n_diff,
+  )
+  ) %>%
+  mutate(d = map2_dbl(i,j,~1 - concepts_d_matrix[.y, .x])) %>%
+  summarise(.by = id,
+            Difform = sum(n_diff_i * n_diff_j * d),
+            True_Difform = 1 / (1 - Difform)) -> difformity_db
 ```
 
 Jack-in
@@ -134,40 +201,73 @@ Jack-in
 
 sampling_frame %>%
   left_join(diversity_db) %>%
-  left_join(oddity_db) %>%
+  left_join(difformity_db) %>%
   mutate(COVID19 = factor(year, levels = c("PRE","POST"))) %>%
-  summarise(Diversity = sum(LC*author_contribution, na.rm = T)/
-              sum(author_contribution),
-            Surprise = sum(Surprise*author_contribution, na.rm = T)/
-              sum(author_contribution),
+  summarise(
+    output = sum(author_contribution),
+    Diversity = sum(True_RS*author_contribution, na.rm = T)/output,
+    Difformity = sum(True_Difform*author_contribution, na.rm = T)/ output,
             .by = c(department,COVID19)
             ) %>%
   summarise(
-    corr = cor(Diversity,Surprise)
+    m.output = mean(output),
+    m.Diversity = mean(Diversity),
+    m.Difformity = mean(Difformity),
+    sd.Div = sd(Diversity),
+    sd.Diff = sd(Difformity),
+    corrDD = cor(Diversity,Difformity),
+    corrD1O = cor(output,Diversity),
+    corrD2O = cor(output,Difformity),
+    .by = COVID19
   )
+```
 
+Graph result
+
+```{r}
 ggMarginal(
 sampling_frame %>%
   left_join(diversity_db) %>%
-  left_join(oddity_db) %>%
+  left_join(difformity_db) %>%
   mutate(COVID19 = factor(year, levels = c("PRE","POST"))) %>%
-  summarise(Diversity = sum(LC*author_contribution, na.rm = T)/
+  summarise(Diversity = sum(True_RS*author_contribution, na.rm = T)/
               sum(author_contribution),
-            Surprise = sum(Surprise*author_contribution, na.rm = T)/
+            Difformity = sum(True_Difform*author_contribution, na.rm = T)/
               sum(author_contribution),
             .by = c(department,COVID19)
             ) %>%
   ggplot(aes(Diversity,
-             Surprise)) +
+             Difformity)) +
   geom_point(aes(color = COVID19)) +
   geom_smooth(method = "lm",
               color = "red") +
-  xlab("Average Diversity") +
-  ylab("Avg. Surprise") +
+  xlab("Avg. Diversity") +
+  ylab("Avg. Difformity") +
   scale_color_viridis_d(option = "D",
-                        begin = 1,
-                        end = 0) +
-  theme_test(),
+                        begin = .9,
+                        end = .3) +
+  theme_test()+
+  theme(legend.position = c(0.85, 0.25)),
 groupColour = T
 )
+
 ```
+
+Results
+
+```{r}
+sampling_frame %>%
+  left_join(diversity_db) %>%
+  left_join(difformity_db) %>%
+  mutate(COVID19 = factor(year, levels = c("PRE","POST"))) %>%
+  summarise(
+    output = sum(author_contribution),
+    Diversity = sum(True_RS*author_contribution, na.rm = T)/output,
+    Difformity = sum(True_Difform*author_contribution, na.rm = T)/ output,
+            .by = c(department,COVID19)
+            ) %>%
+  pivot_wider(names_from = COVID19,
+              values_from = c("Difformity","Diversity","output")) %>% View()
+  
+```
+
